@@ -3,6 +3,11 @@
 const puppeteer = require('puppeteer');
 
 const { XHRLogger } = require('./xhr-logger');
+const { SettleTracker } = require('./settle-tracker');
+
+const LOADED_COOLDOWN = 250;
+
+const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.54 Safari/537.36";
 
 class Crawler {
     constructor(targetURL) {
@@ -12,12 +17,12 @@ class Crawler {
 
         this.pageIsCreated = this.createPage();
         this.abortNavigation = false;
+        this.pageURL = null; // current URL, will be set after URL is opened
     }
 
     async createPage() {
         const browser = await puppeteer.launch({
-            executablePath: 'google-chrome',
-            headless: false
+            executablePath: 'google-chrome'
         });
         this.browser = browser;
 
@@ -31,7 +36,7 @@ class Crawler {
                 this.abortNavigation &&
                 req.isNavigationRequest() &&
                 req.frame() === page.mainFrame() &&
-                req.url() !== this.targetURL
+                req.url() !== this.pageURL
             ) {
                 console.log(`"${url}" not equal to "${targetURL}", so abort nav`);
                 req.abort('aborted');
@@ -41,12 +46,22 @@ class Crawler {
         });
 
         await page.setRequestInterception(true);
+        await page.setUserAgent(USER_AGENT);
+
+        this.settleTracker = new SettleTracker(page, LOADED_COOLDOWN);
     }
 
     async run() {
         await this.pageIsCreated;
         await this.page.goto(this.targetURL, { waitUntil: 'networkidle0' });
 
+        // may differ from this.targetURL due to redirects
+        // for example, http -> https or site.com -> www.site.com
+        this.pageURL = this.page.url();
+
+        await this.settleTracker.waitToSettle();
+
+        //await this.page.screenshot({ path: '/tmp/screenshot.png' });
     }
 }
 
@@ -65,7 +80,7 @@ class Crawler {
     
     console.log('load done');
 
-    //await browser.close();
+    await crawler.browser.close();
 
     console.log(JSON.stringify(crawler.xhrLogger.requests, null, 4));
 })();
