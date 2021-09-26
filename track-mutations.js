@@ -34,7 +34,7 @@ class PageMutationTracker {
 
     async mutationsSettled() {
         if (!this.domContentLoaded) {
-            console.log('dom content not loaded yet');
+            //console.log('dom content not loaded yet');
             return false;
         }
 
@@ -43,9 +43,9 @@ class PageMutationTracker {
             this.timestampContainer
         );
         
-        console.log('now ' + Date.now() + ' last mut ' + lastMutation )
+        //console.log('now ' + Date.now() + ' last mut ' + lastMutation )
         const sinceLastMutation = Date.now() - lastMutation;
-        console.log('settled: ' + (sinceLastMutation > this.cooldown));
+        //console.log('settled: ' + (sinceLastMutation > this.cooldown));
 
         return sinceLastMutation > this.cooldown;
     }

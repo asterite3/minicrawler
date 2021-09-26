@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "argparse": "^2.0.1",
+    "puppeteer": "^2.0.0"
+  }
+}

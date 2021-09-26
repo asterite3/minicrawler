@@ -1,28 +1,35 @@
 'use strict';
 
 const puppeteer = require('puppeteer');
+const { ArgumentParser } = require('argparse');
 
 const { XHRLogger } = require('./xhr-logger');
 const { SettleTracker } = require('./settle-tracker');
+const { getPossibleEvents } = require('./page-events');
+const { log } = require('./logging');
 
 const LOADED_COOLDOWN = 250;
 
 const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.54 Safari/537.36";
 
 class Crawler {
-    constructor(targetURL) {
+    constructor(targetURL, headless=true) {
         // normalize
         this.targetURL = new URL(targetURL).href;
         this.xhrLogger = new XHRLogger(this.targetURL);
 
-        this.pageIsCreated = this.createPage();
         this.abortNavigation = false;
         this.pageURL = null; // current URL, will be set after URL is opened
+
+        this.headless = headless;
+
+        this.pageIsCreated = this.createPage();
     }
 
     async createPage() {
         const browser = await puppeteer.launch({
-            executablePath: 'google-chrome'
+            executablePath: 'google-chrome',
+            headless: this.headless
         });
         this.browser = browser;
 
@@ -35,10 +42,8 @@ class Crawler {
             if (
                 this.abortNavigation &&
                 req.isNavigationRequest() &&
-                req.frame() === page.mainFrame() &&
-                req.url() !== this.pageURL
+                req.frame() === page.mainFrame()
             ) {
-                console.log(`"${url}" not equal to "${targetURL}", so abort nav`);
                 req.abort('aborted');
             } else {
                 req.continue();
@@ -55,30 +60,48 @@ class Crawler {
         await this.pageIsCreated;
         await this.page.goto(this.targetURL, { waitUntil: 'networkidle0' });
 
+        await this.settleTracker.waitToSettle();
+
+        log('page load done');
+
         // may differ from this.targetURL due to redirects
         // for example, http -> https or site.com -> www.site.com
         this.pageURL = this.page.url();
 
-        await this.settleTracker.waitToSettle();
+        this.abortNavigation = true;
+        //await this.page.screenshot({path: '/tmp/screenshot.png'});
+        
+        const events = await getPossibleEvents(this.page);
 
-        //await this.page.screenshot({ path: '/tmp/screenshot.png' });
+        for (const event of events) {
+            if (event.type !== 'click') {
+                log(`skip event of type ${event.type}, only clicks are supported for now`);
+                continue;
+            }
+
+            const elem = event.element;
+            log('click', elem._remoteObject.description);            
+            await elem.click();
+            await this.settleTracker.waitToSettle();
+            log('clicked, proceed to next event');
+        }
     }
 }
 
 
 
 (async () => {
-    if (process.argv.length < 3) {
-        console.log('need url arg');
-        process.exit(1);
-    }
+    const parser = new ArgumentParser();
 
-    const crawler = new Crawler(process.argv[2]);
+    parser.add_argument('target_url');
+    parser.add_argument('--no-headless', { action: 'store_true' });
 
+    const args = parser.parse_args();
+
+
+    const crawler = new Crawler(args.target_url, !args.no_headless);
     
     await crawler.run();
-    
-    console.log('load done');
 
     await crawler.browser.close();
 

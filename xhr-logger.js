@@ -4,6 +4,7 @@ const {
 } = require('../js-analyzer/src/analyzer/domain-filtering');
 
 const { harFromRequest } = require('./har');
+const { log } = require('./logging');
 
 class XHRLogger {
     constructor(baseURL) {
@@ -24,12 +25,20 @@ class XHRLogger {
             return;
         }
 
-        const postData = req.postData();
-        console.log(
-            req.method() + ' ' + req.url() +
-            (typeof postData !== 'undefined' ? ' ' + postData : '')
-        );
+        this.logToConsole(req);
+        
         this.requests.push(harFromRequest(req));
+    }
+
+    logToConsole(req) {
+        const postData = req.postData();
+        let printedPostData = '';
+
+        if (typeof postData !== 'undefined') {
+            printedPostData = ' ' + postData.substring(0, 100);
+        }
+
+        log(`${req.method()} ${req.url()} ${printedPostData}`);
     }
 }
 
