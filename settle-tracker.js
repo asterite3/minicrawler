@@ -20,7 +20,7 @@ class SettleTracker {
 
     initPageMutationTracker() {
         this.frame = this.page.mainFrame();
-        this.mutationTracker = new PageMutationTracker(page, this.cooldown);
+        this.mutationTracker = new PageMutationTracker(this.page, this.cooldown);
     }
 
     handleRequestStarted(req) {
