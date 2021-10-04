@@ -50,7 +50,10 @@ class SettleTracker {
     async waitToSettle() {
         while (true) {
             if (this.pendingRequestCount > 0) {
+                //console.log('there are still ' + this.pendingRequestCount + ' pending requests, wait for them');
                 await this.waitForRequests();
+                await wait(100);
+                continue;
             }
             const mutationsSettled = await this.mutationTracker.mutationsSettled();
             if (!mutationsSettled) {
