@@ -19,6 +19,7 @@ class Crawler {
         this.xhrLogger = new XHRLogger(this.targetURL);
 
         this.abortNavigation = false;
+        this.preventNewFrames = false;
         this.pageURL = null; // current URL, will be set after URL is opened
 
         this.headless = headless;
@@ -27,23 +28,34 @@ class Crawler {
     }
 
     async createPage() {
-        const browser = await puppeteer.launch({
+        const options = {
             executablePath: 'google-chrome',
             headless: this.headless
-        });
+        };
+        if (!this.headless) {
+            options.defaultViewport = null;
+        }
+        const browser = await puppeteer.launch(options);
         this.browser = browser;
+
+        browser.on('targetcreated', async target => {
+            if (this.preventNewFrames && target.type() === 'page') {
+                const page = await target.page();
+                await page.close();
+            }
+        })
 
         const page = await browser.newPage();
         this.page = page;
 
         page.on('request', req => {
+            // NOTE: we currently ignore requests from subframes
+            if (req.frame() !== page.mainFrame()) {
+                return;
+            }
             this.xhrLogger.addRequest(req);
 
-            if (
-                this.abortNavigation &&
-                req.isNavigationRequest() &&
-                req.frame() === page.mainFrame()
-            ) {
+            if (this.abortNavigation && req.isNavigationRequest()) {
                 req.abort('aborted');
             } else {
                 req.continue();
@@ -56,9 +68,16 @@ class Crawler {
         this.settleTracker = new SettleTracker(page, LOADED_COOLDOWN);
     }
 
-    async run() {
-        await this.pageIsCreated;
+    /*async reload() {
+        this.abortNavigation = false;
+        await this.page.goto(this.pageURL, { waitUntil: 'networkidle0' });
+        await this.settleTracker.waitToSettle()
+    }*/
+
+    async _run() {
         await this.page.goto(this.targetURL, { waitUntil: 'networkidle0' });
+
+        log('page load complete, networkidle0 arrived. Wait to settle');
 
         await this.settleTracker.waitToSettle();
 
@@ -69,8 +88,8 @@ class Crawler {
         this.pageURL = this.page.url();
 
         this.abortNavigation = true;
-        //await this.page.screenshot({path: '/tmp/screenshot.png'});
-        
+        this.preventNewFrames = true;
+
         const events = await getPossibleEvents(this.page);
 
         for (const event of events) {
@@ -80,10 +99,32 @@ class Crawler {
             }
 
             const elem = event.element;
-            log('click', elem._remoteObject.description);            
-            await elem.click();
+            const descr = elem._remoteObject.description;
+            log('click', descr);
+            try {
+                await elem.click();
+            } catch(err) {
+                log('failed to click', descr, err);
+                console.log(err.message);
+                log('fall back to .click()');
+                try {
+                    await this.page.evaluate(elem => elem.click(), elem);
+                } catch(err) {
+                    log('failed to click using .click()', descr, err);
+                }
+            }
             await this.settleTracker.waitToSettle();
             log('clicked, proceed to next event');
+        }
+    }
+
+    async run() {
+        try {
+            await this.pageIsCreated;
+
+            await this._run();
+        } finally {
+            await this.browser.close();
         }
     }
 }
@@ -98,12 +139,9 @@ class Crawler {
 
     const args = parser.parse_args();
 
-
     const crawler = new Crawler(args.target_url, !args.no_headless);
-    
-    await crawler.run();
 
-    await crawler.browser.close();
+    await crawler.run();
 
     console.log(JSON.stringify(crawler.xhrLogger.requests, null, 4));
 })();
