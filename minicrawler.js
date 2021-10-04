@@ -30,7 +30,8 @@ class Crawler {
     async createPage() {
         const options = {
             executablePath: 'google-chrome',
-            headless: this.headless
+            headless: this.headless,
+            ignoreHTTPSErrors: true
         };
         if (!this.headless) {
             options.defaultViewport = null;
