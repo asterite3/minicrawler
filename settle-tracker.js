@@ -4,21 +4,38 @@ const { wait } = require('./utils');
 class SettleTracker {
     constructor(page, cooldown) {
         this.cooldown = cooldown;
-        this.mutationTracker = new PageMutationTracker(page, cooldown);
-        this.pendingRequestCount = 0;
+        this.page = page;
 
+        this.initPageMutationTracker()
+
+        this.pendingRequestCount = 0;
         this.notifyRequestsAreDone = null;
 
         page.on('request', this.handleRequestStarted.bind(this));
         page.on('requestfinished', this.handleRequestEnded.bind(this));
         page.on('requestfailed', this.handleRequestEnded.bind(this));
+
+        // this.pendingRequests = Object.create(null);
     }
 
-    handleRequestStarted() {
+    initPageMutationTracker() {
+        this.frame = this.page.mainFrame();
+        this.mutationTracker = new PageMutationTracker(page, this.cooldown);
+    }
+
+    handleRequestStarted(req) {
+        // NOTE: we currently ignore requests from subframes
+        if (req.frame() !== this.frame) {
+            return;
+        }
         this.pendingRequestCount++;
     }
 
-    handleRequestEnded() {
+    handleRequestEnded(req) {
+        // NOTE: we currently ignore requests from subframes
+        if (req.frame() !== this.frame) {
+            return;
+        }
         this.pendingRequestCount--;
         if (this.pendingRequestCount === 0 && this.notifyRequestsAreDone !== null) {
             this.notifyRequestsAreDone();
