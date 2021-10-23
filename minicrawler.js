@@ -53,21 +53,6 @@ class Crawler {
         const page = await browser.newPage();
         this.page = page;
 
-        page.on('request', req => {
-            // NOTE: we currently ignore requests from subframes
-            if (req.frame() !== page.mainFrame()) {
-                return;
-            }
-            this.xhrLogger.addRequest(req);
-
-            if (this.abortNavigation && req.isNavigationRequest()) {
-                req.abort('aborted');
-            } else {
-                req.continue();
-            }
-        });
-
-        await page.setRequestInterception(true);
         await page.setUserAgent(USER_AGENT);
 
         this.settleTracker = new SettleTracker(page, LOADED_COOLDOWN);
@@ -79,7 +64,20 @@ class Crawler {
         await this.settleTracker.waitToSettle()
     }*/
 
-    async _run() {
+    async handleRequest(handler) {
+        await this.pageIsCreated;
+        this.page.on('request', handler);
+        await this.page.setRequestInterception(true);
+    }
+
+    async handleResponse(handler) {
+        await this.pageIsCreated;
+        this.page.on('response', handler);
+    }
+
+    async loadPage() {
+        await this.pageIsCreated;
+
         try {
             await this.page.goto(this.targetURL, {
                 waitUntil: 'networkidle0',
@@ -108,7 +106,9 @@ class Crawler {
 
         this.abortNavigation = true;
         this.preventNewFrames = true;
+    }
 
+    async clickAllEvents() {
         const events = await getPossibleEvents(this.page);
 
         for (const event of events) {
@@ -137,30 +137,9 @@ class Crawler {
         }
     }
 
-    async run() {
-        try {
-            await this.pageIsCreated;
-
-            await this._run();
-        } finally {
-            await this.browser.close();
-        }
+    async close() {
+        await this.browser.close();
     }
 }
 
-
-
-(async () => {
-    const parser = new ArgumentParser();
-
-    parser.add_argument('target_url');
-    parser.add_argument('--no-headless', { action: 'store_true' });
-
-    const args = parser.parse_args();
-
-    const crawler = new Crawler(args.target_url, !args.no_headless);
-
-    await crawler.run();
-
-    console.log(JSON.stringify(crawler.xhrLogger.requests, null, 4));
-})();
+exports.Crawler = Crawler;
