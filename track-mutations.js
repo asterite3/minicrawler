@@ -1,10 +1,10 @@
-function trackMutations() {
+function trackMutations(currentTimestamp) {
     const timestampContainer = {
-        lastDOMMutation: Date.now()
+        lastDOMMutation: currentTimestamp
     };
 
     const observer = new MutationObserver(() => {
-        timestampContainer.lastDOMMutation = Date.now();
+        timestampContainer.lastDOMMutation = currentTimestamp;
     });
 
     observer.observe(document.documentElement, {
@@ -21,13 +21,21 @@ function getLastMutationTimestamp(timestampContainer) {
     return timestampContainer.lastDOMMutation;
 }
 
+function getCurrentTimestamp() {
+    return Date.now();
+}
+
 class PageMutationTracker {
     constructor(page, cooldown) {
         this.page = page;
         this.cooldown = cooldown;
         this.domContentLoaded = false;
+
+        page.on('framenavigated', async () => {
+            this.currentTimestamp = await page.evaluateHandle(getCurrentTimestamp);
+        });
         page.on('domcontentloaded', async () => {
-            this.timestampContainer = await page.evaluateHandle(trackMutations);
+            this.timestampContainer = await page.evaluateHandle(trackMutations, this.currentTimestamp);
             this.domContentLoaded = true;
         });
     }

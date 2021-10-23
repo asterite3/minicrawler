@@ -8,6 +8,8 @@ const { SettleTracker } = require('./settle-tracker');
 const { getPossibleEvents } = require('./page-events');
 const { log } = require('./logging');
 
+const { waitWithCancel } = require('./utils');
+
 const LOADED_COOLDOWN = 250;
 
 const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.54 Safari/537.36";
@@ -15,7 +17,9 @@ const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, l
 class Crawler {
     constructor(targetURL, headless=true) {
         // normalize
-        this.targetURL = new URL(targetURL).href;
+        const u = new URL(targetURL);
+        u.hash = '';
+        this.targetURL = u.href;
         this.xhrLogger = new XHRLogger(this.targetURL);
 
         this.abortNavigation = false;
@@ -76,11 +80,25 @@ class Crawler {
     }*/
 
     async _run() {
-        await this.page.goto(this.targetURL, { waitUntil: 'networkidle0' });
+        try {
+            await this.page.goto(this.targetURL, {
+                waitUntil: 'networkidle0',
+                timeout: 3 * 60 * 1000,
+            });
+        } catch (err) {
+            if (!(err instanceof puppeteer.errors.TimeoutError)) {
+                throw(err);
+            }
+        }
 
         log('page load complete, networkidle0 arrived. Wait to settle');
 
-        await this.settleTracker.waitToSettle();
+        let {timer, cancel} = waitWithCancel(3 * 60 * 1000);
+
+        await Promise.race([this.settleTracker.waitToSettle(), timer]);
+
+        cancel();
+        this.settleTracker.stop();
 
         log('page load done');
 
