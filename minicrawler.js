@@ -91,7 +91,7 @@ class Crawler {
 
         log('page load complete, networkidle0 arrived. Wait to settle');
 
-        let {timer, cancel} = waitWithCancel(3 * 60 * 1000);
+        let {promise: timer, cancel} = waitWithCancel(3 * 60 * 1000);
 
         await Promise.race([this.settleTracker.waitToSettle(), timer]);
 
