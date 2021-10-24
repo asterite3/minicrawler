@@ -1,10 +1,12 @@
-function trackMutations() {
+const crypto = require('crypto');
+
+function trackMutations(datenowName) {
     const timestampContainer = {
-        lastDOMMutation: Date.now()
+        lastDOMMutation: window[Symbol.for(datenowName)]()
     };
 
     const observer = new MutationObserver(() => {
-        timestampContainer.lastDOMMutation = Date.now();
+        timestampContainer.lastDOMMutation = window[Symbol.for(datenowName)]();
     });
 
     observer.observe(document.documentElement, {
@@ -26,8 +28,16 @@ class PageMutationTracker {
         this.page = page;
         this.cooldown = cooldown;
         this.domContentLoaded = false;
+
+        let datenowName = crypto.randomBytes(20).toString('hex');
+
+        this.ready = page.evaluateOnNewDocument(datenowName => {
+            window[Symbol.for(datenowName)] = Date.now;
+        }, datenowName);
+
         page.on('domcontentloaded', async () => {
-            this.timestampContainer = await page.evaluateHandle(trackMutations);
+            await this.ready;
+            this.timestampContainer = await page.evaluateHandle(trackMutations, datenowName);
             this.domContentLoaded = true;
         });
     }

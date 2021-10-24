@@ -8,6 +8,8 @@ const { SettleTracker } = require('./settle-tracker');
 const { getPossibleEvents } = require('./page-events');
 const { log } = require('./logging');
 
+const { waitWithCancel } = require('./utils');
+
 const LOADED_COOLDOWN = 250;
 
 const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.54 Safari/537.36";
@@ -15,7 +17,9 @@ const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, l
 class Crawler {
     constructor(targetURL, headless=true) {
         // normalize
-        this.targetURL = new URL(targetURL).href;
+        const u = new URL(targetURL);
+        u.hash = '';
+        this.targetURL = u.href;
         this.xhrLogger = new XHRLogger(this.targetURL);
 
         this.abortNavigation = false;
@@ -49,21 +53,6 @@ class Crawler {
         const page = await browser.newPage();
         this.page = page;
 
-        page.on('request', req => {
-            // NOTE: we currently ignore requests from subframes
-            if (req.frame() !== page.mainFrame()) {
-                return;
-            }
-            this.xhrLogger.addRequest(req);
-
-            if (this.abortNavigation && req.isNavigationRequest()) {
-                req.abort('aborted');
-            } else {
-                req.continue();
-            }
-        });
-
-        await page.setRequestInterception(true);
         await page.setUserAgent(USER_AGENT);
 
         this.settleTracker = new SettleTracker(page, LOADED_COOLDOWN);
@@ -75,12 +64,39 @@ class Crawler {
         await this.settleTracker.waitToSettle()
     }*/
 
-    async _run() {
-        await this.page.goto(this.targetURL, { waitUntil: 'networkidle0' });
+    async handleRequest(handler) {
+        await this.pageIsCreated;
+        this.page.on('request', handler);
+        await this.page.setRequestInterception(true);
+    }
+
+    async handleResponse(handler) {
+        await this.pageIsCreated;
+        this.page.on('response', handler);
+    }
+
+    async loadPage() {
+        await this.pageIsCreated;
+
+        try {
+            await this.page.goto(this.targetURL, {
+                waitUntil: 'networkidle0',
+                timeout: 3 * 60 * 1000,
+            });
+        } catch (err) {
+            if (!(err instanceof puppeteer.errors.TimeoutError)) {
+                throw(err);
+            }
+        }
 
         log('page load complete, networkidle0 arrived. Wait to settle');
 
-        await this.settleTracker.waitToSettle();
+        let {promise: timer, cancel} = waitWithCancel(3 * 60 * 1000);
+
+        await Promise.race([this.settleTracker.waitToSettle(), timer]);
+
+        cancel();
+        this.settleTracker.stop();
 
         log('page load done');
 
@@ -90,7 +106,9 @@ class Crawler {
 
         this.abortNavigation = true;
         this.preventNewFrames = true;
+    }
 
+    async clickAllEvents() {
         const events = await getPossibleEvents(this.page);
 
         for (const event of events) {
@@ -119,30 +137,9 @@ class Crawler {
         }
     }
 
-    async run() {
-        try {
-            await this.pageIsCreated;
-
-            await this._run();
-        } finally {
-            await this.browser.close();
-        }
+    async close() {
+        await this.browser.close();
     }
 }
 
-
-
-(async () => {
-    const parser = new ArgumentParser();
-
-    parser.add_argument('target_url');
-    parser.add_argument('--no-headless', { action: 'store_true' });
-
-    const args = parser.parse_args();
-
-    const crawler = new Crawler(args.target_url, !args.no_headless);
-
-    await crawler.run();
-
-    console.log(JSON.stringify(crawler.xhrLogger.requests, null, 4));
-})();
+exports.Crawler = Crawler;

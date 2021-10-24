@@ -1,8 +1,3 @@
-const {
-    filterByDomain,
-    DomainFilteringMode
-} = require('../js-analyzer/src/analyzer/domain-filtering');
-
 const { harFromRequest } = require('./har');
 const { log } = require('./logging');
 
@@ -10,6 +5,7 @@ class XHRLogger {
     constructor(baseURL) {
         this.requests = [];
         this.baseURL = baseURL;
+        this.interactionsStarted = false;
     }
 
     addRequest(req) {
@@ -21,13 +17,13 @@ class XHRLogger {
 
         const url = req.url();
 
-        if (!filterByDomain(url, this.baseURL, DomainFilteringMode.SecondLevel)) {
-            return;
-        }
-
         this.logToConsole(req);
+
+        const har = harFromRequest(req);
+        har.initiator = req.initiator();
+        har.initiator.wasDuringInteraction = this.interactionsStarted;
         
-        this.requests.push(harFromRequest(req));
+        this.requests.push(har);
     }
 
     logToConsole(req) {

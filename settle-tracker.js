@@ -15,6 +15,7 @@ class SettleTracker {
         page.on('requestfinished', this.handleRequestEnded.bind(this));
         page.on('requestfailed', this.handleRequestEnded.bind(this));
 
+        this.stopped = false;
         // this.pendingRequests = Object.create(null);
     }
 
@@ -48,7 +49,7 @@ class SettleTracker {
     }
 
     async waitToSettle() {
-        while (true) {
+        while (!this.stopped) {
             if (this.pendingRequestCount > 0) {
                 //console.log('there are still ' + this.pendingRequestCount + ' pending requests, wait for them');
                 await this.waitForRequests();
@@ -62,6 +63,10 @@ class SettleTracker {
             }
             return;
         }
+    }
+
+    stop() {
+        this.stopped = true;
     }
 }
 
