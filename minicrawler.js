@@ -15,6 +15,7 @@ const { withTimeout, wait, getRandomString } = require('./utils');
 const LOADED_COOLDOWN = 250;
 const PAGE_LOAD_TIMEOUT = 3 * 60 * 1000;
 const MAX_TIMEOUT_COUNT = 2;
+const MAX_TIMEOUT_COUNT2 = 40;
 
 const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.54 Safari/537.36";
 
@@ -55,9 +56,17 @@ class Crawler {
                 log(`waiting for event timed out, timeout was ${this.timeout}`);
             }
             this.timeoutCount++;
-            if (this.timeoutCount === MAX_TIMEOUT_COUNT) {
-                log(`timed out too many times, lowering timeout`);
-                this.timeout = 1000;
+
+            if (this.timeoutCount >= MAX_TIMEOUT_COUNT) {
+                if (this.timeoutCount < MAX_TIMEOUT_COUNT2) {
+                    log(`timed out too many times, lowering timeout`);
+                    this.timeout = 1000;
+                } else {
+                    if (this.timeoutCount === MAX_TIMEOUT_COUNT2) {
+                        log(`timed out more than ${MAX_TIMEOUT_COUNT2} times, reducing timeout even further`);
+                    }
+                    this.timeout = 600;
+                }
             }
         }
 

@@ -1,5 +1,7 @@
 const { ElementHandle } = require('puppeteer/lib/JSHandle');
 
+const { shuffleArray } = require('./utils');
+
 const OBJECT_GROUP_NAME = 'event-listeners-group';
 
 async function getPossibleEvents(page) {
@@ -55,7 +57,11 @@ async function getPossibleEvents(page) {
             )
         };
     }));
-    return clickEvents.concat(inputEvents, submitEvents, jsEvents);
+    return jsEvents.concat(
+        inputEvents,
+        submitEvents,
+        shuffleArray(clickEvents)
+    );
 };
 
 exports.getPossibleEvents = getPossibleEvents;
