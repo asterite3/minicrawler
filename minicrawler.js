@@ -9,9 +9,11 @@ const { getPossibleEvents } = require('./page-events');
 const { getSelector } = require('./get-selector');
 const { log } = require('./logging');
 
-const { waitWithCancel, wait } = require('./utils');
+const { withTimeout, wait } = require('./utils');
 
 const LOADED_COOLDOWN = 250;
+const PAGE_LOAD_TIMEOUT = 3 * 60 * 1000;
+const MAX_TIMEOUT_COUNT = 2;
 
 const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.54 Safari/537.36";
 
@@ -32,6 +34,29 @@ class Crawler {
         this.headless = headless;
 
         this.pageIsCreated = this.createPage();
+        this.timeout = PAGE_LOAD_TIMEOUT;
+        this.timeoutCount = 0;
+    }
+
+    async withTimeout(p) {
+        return await withTimeout(p, this.timeout);
+    }
+
+    async waitToSettle() {
+        const timedOut = await this.withTimeout(this.settleTracker.waitToSettle());
+
+        if (timedOut) {
+            if (this.timeoutCount < MAX_TIMEOUT_COUNT) {
+                log(`waiting for event timed out, timeout was ${this.timeout}`);
+            }
+            this.timeoutCount++;
+            if (this.timeoutCount === MAX_TIMEOUT_COUNT) {
+                log(`timed out too many times, lowering timeout`);
+                this.timeout = 1000;
+            }
+        }
+
+        return timedOut;
     }
 
     async createPage() {
@@ -78,27 +103,26 @@ class Crawler {
         this.page.on('response', handler);
     }
 
-    async loadPage() {
+    async loadPage(timeout=PAGE_LOAD_TIMEOUT) {
         await this.pageIsCreated;
 
         try {
             await this.page.goto(this.targetURL, {
                 waitUntil: 'networkidle0',
-                timeout: 3 * 60 * 1000,
+                timeout: timeout,
             });
         } catch (err) {
             if (!(err instanceof puppeteer.errors.TimeoutError)) {
                 throw(err);
+            } else {
+                log(`warning: page.goto timed out (with networkidle0)`)
             }
         }
 
         log('page load complete, networkidle0 arrived. Wait to settle');
 
-        let {promise: timer, cancel} = waitWithCancel(3 * 60 * 1000);
+        await this.waitToSettle();
 
-        await Promise.race([this.settleTracker.waitToSettle(), timer]);
-
-        cancel();
         this.settleTracker.stop();
 
         log('page load done');
@@ -152,15 +176,9 @@ class Crawler {
             );
 
             if (!selectorIsGood) {
-                if (elemCount < 1) {
-                    log(`bad selector ${descr} matches nothing!`)
-                } else if (elemCount > 1) {
-                    log(`bad selector ${descr} is non-unique!`);
-                }
+                const oldDescr = descr;
                 descr = await this.page.evaluate(getSelector, elem);
-                log(`better selector is ${descr}`);
-            } else {
-                log(`good selector ${descr} is good!`);
+                log(`generated more accurate selector ${descr} instead of ${oldDescr}`);
             }
             const eventTag = event.type + ' ' + descr;
             if (alreadyDone.has(eventTag)) {
@@ -180,7 +198,9 @@ class Crawler {
             }
             await wait(150);
 
-            await this.settleTracker.waitToSettle();
+            this.timeout = Math.min(this.timeout, 20 * 1000);
+            await this.waitToSettle();
+            this.settleTracker.stop();
             if (this.navigationWasAttempted) {
                 log('navigation was triggred, maybe handle it somehow later');
             }
@@ -207,16 +227,57 @@ class Crawler {
         });
     }
 
+    async #checkWindowScrollable() {
+        return await this.page.evaluate(() => {
+            for (const el of [document.documentElement, document.body]) {
+                if (el.scrollHeight > el.clientHeight) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+
+    async #scrollToBottom() {
+        let originalOffset = 0;
+        while (true) {
+            // TODO: use this.page.mouse.wheel after upgrading puppeteer
+            //const scrollHeight = await this.page.evaluate('document.body.scrollHeight');
+            /*await this.page.mouse.wheel({
+                deltaY: scrollHeight
+            })*/
+            await this.page.evaluate('window.scrollBy(0, document.body.scrollHeight)');
+            await this.waitToSettle();
+            this.settleTracker.stop();
+            const newOffset = await this.page.evaluate('window.pageYOffset');
+            if (originalOffset === newOffset) {
+                break;
+            }
+            originalOffset = newOffset;
+        }
+    }
+
     async crawl() {
         this.#setupCrawlEventHandler();
 
         let prevRetryEvent = null;
+        let shouldScroll = false;
         const eventsAlreadyDone = new Set();
 
+        let timeout = PAGE_LOAD_TIMEOUT;
+
         while (true) {
-            await this.loadPage();
+            await this.loadPage(timeout);
 
             const events = await getPossibleEvents(this.page);
+
+            events.filter(evt => {
+                if (evt.type === 'scroll') {
+                    shouldScroll = true;
+                    return false;
+                }
+            })
+
             const [retryEvent, allDone] = await this.triggerEvents(
                 events,
                 eventsAlreadyDone
@@ -233,7 +294,28 @@ class Crawler {
                     prevRetryEvent = retryEvent;
                 }
             }
+            timeout = 30 * 1000;
             this.abortNavigation = false;
+        }
+
+        this.abortNavigation = false;
+        await this.loadPage(timeout);
+
+        if (!shouldScroll) {
+            shouldScroll = await this.#checkWindowScrollable();
+            if (shouldScroll) {
+                log('should scroll because there are scrollbars');
+            } else {
+                log('should not scroll');
+            }
+        } else {
+            log('should scroll because there are scroll event handlers');
+        }
+
+        if (shouldScroll) {
+            await this.#scrollToBottom();
+            await this.waitToSettle();
+            this.settleTracker.stop();
         }
     }
 
