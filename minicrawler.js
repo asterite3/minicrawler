@@ -151,6 +151,7 @@ class Crawler {
             if (shouldReload) {
                 return [eventTag, false];
             }
+            await wait(100);
 
             await this.settleTracker.waitToSettle();
             if (this.navigationWasAttempted) {
