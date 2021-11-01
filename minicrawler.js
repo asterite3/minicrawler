@@ -8,7 +8,7 @@ const { SettleTracker } = require('./settle-tracker');
 const { getPossibleEvents } = require('./page-events');
 const { log } = require('./logging');
 
-const { waitWithCancel } = require('./utils');
+const { waitWithCancel, wait } = require('./utils');
 
 const LOADED_COOLDOWN = 250;
 
@@ -111,6 +111,26 @@ class Crawler {
         this.navigationWasAttempted = false;
     }
 
+    async performClick(elem, descr) {
+        log('click', descr);
+        try {
+            await elem.click();
+        } catch(err) {
+            log('failed to click', descr, err);
+            if (err.message === 'Node is detached from document') {
+                log('Node detached from document, reload and retry');
+                return true;
+            }
+            log('fall back to .click()');
+            try {
+                await this.page.evaluate(elem => elem.click(), elem);
+            } catch(err) {
+                log('failed to click using .click()', descr, err);
+            }
+        }
+        return false;
+    }
+
     async triggerEvents(events, alreadyDone) {
         for (const event of events) {
             const elem = event.element;
@@ -126,22 +146,12 @@ class Crawler {
                 continue;
             }
 
-            log('click', descr);
-            try {
-                await elem.click();
-            } catch(err) {
-                if (err.message === 'Node is detached from document') {
-                    log('Node detached from document, reload and retry');
-                    return [eventTag, false];
-                }
-                log('failed to click', descr, err);
-                log('fall back to .click()');
-                try {
-                    await this.page.evaluate(elem => elem.click(), elem);
-                } catch(err) {
-                    log('failed to click using .click()', descr, err);
-                }
+            const shouldReload = await this.performClick(elem, descr);
+
+            if (shouldReload) {
+                return [eventTag, false];
             }
+
             await this.settleTracker.waitToSettle();
             if (this.navigationWasAttempted) {
                 log('navigation was triggred, maybe handle it somehow later');
