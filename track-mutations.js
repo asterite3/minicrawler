@@ -55,7 +55,7 @@ class PageMutationTracker {
         
         //console.log('now ' + Date.now() + ' last mut ' + lastMutation )
         const sinceLastMutation = Date.now() - lastMutation;
-        //console.log('settled: ' + (sinceLastMutation > this.cooldown));
+        //console.log('settled: ' + (sinceLastMutation > this.cooldown), `(${sinceLastMutation})`);
 
         return sinceLastMutation > this.cooldown;
     }

@@ -49,6 +49,7 @@ class SettleTracker {
     }
 
     async waitToSettle() {
+        this.stopped = false;
         while (!this.stopped) {
             if (this.pendingRequestCount > 0) {
                 //console.log('there are still ' + this.pendingRequestCount + ' pending requests, wait for them');
