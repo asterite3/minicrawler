@@ -6,6 +6,7 @@ const { ArgumentParser } = require('argparse');
 const { XHRLogger } = require('./xhr-logger');
 const { SettleTracker } = require('./settle-tracker');
 const { getPossibleEvents } = require('./page-events');
+const { getSelector } = require('./get-selector');
 const { log } = require('./logging');
 
 const { waitWithCancel, wait } = require('./utils');
@@ -134,7 +135,33 @@ class Crawler {
     async triggerEvents(events, alreadyDone) {
         for (const event of events) {
             const elem = event.element;
-            const descr = elem._remoteObject.description;
+            let descr = elem._remoteObject.description;
+
+            if (!await this.page.evaluate(el => el.isConnected, elem)) {
+                log(`Node ${descr} detached from document, reload and retry`);
+                return [null, false];
+            }
+
+            const [selectorIsGood, elemCount] = await this.page.evaluate(
+                (sel, el) =>  {
+                    let elems = document.querySelectorAll(sel);
+                    return [elems.length === 1 && elems[0] === el, elems.length]
+                },
+                descr,
+                elem
+            );
+
+            if (!selectorIsGood) {
+                if (elemCount < 1) {
+                    log(`bad selector ${descr} matches nothing!`)
+                } else if (elemCount > 1) {
+                    log(`bad selector ${descr} is non-unique!`);
+                }
+                descr = await this.page.evaluate(getSelector, elem);
+                log(`better selector is ${descr}`);
+            } else {
+                log(`good selector ${descr} is good!`);
+            }
             const eventTag = event.type + ' ' + descr;
             if (alreadyDone.has(eventTag)) {
                 log(`skip event ${eventTag}: already done it`);
@@ -151,7 +178,7 @@ class Crawler {
             if (shouldReload) {
                 return [eventTag, false];
             }
-            await wait(100);
+            await wait(300);
 
             await this.settleTracker.waitToSettle();
             if (this.navigationWasAttempted) {
@@ -197,12 +224,14 @@ class Crawler {
             if (allDone) {
                 break;
             }
-            if (prevRetryEvent !== null && retryEvent === prevRetryEvent) {
-                log(`already retried ${retryEvent}, giving up on it`);
-                prevRetryEvent = null;
-            } else {
-                eventsAlreadyDone.delete(retryEvent);
-                prevRetryEvent = retryEvent;
+            if (retryEvent !== null) {
+                if (prevRetryEvent !== null && retryEvent === prevRetryEvent) {
+                    log(`already retried ${retryEvent}, giving up on it`);
+                    prevRetryEvent = null;
+                } else {
+                    eventsAlreadyDone.delete(retryEvent);
+                    prevRetryEvent = retryEvent;
+                }
             }
             this.abortNavigation = false;
         }

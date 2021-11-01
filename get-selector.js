@@ -52,7 +52,7 @@ function getSelector(elem) {
         }
 
         if (parentElement.childElementCount > 1) {
-            index = toArray(elem.parentNode.children).indexOf(elem) + 1;
+            index = Array.from(elem.parentNode.children).indexOf(elem) + 1;
             // index = elementIndex(elem) + 1;
             selector += ':nth-child(' + index + ')';
         }
@@ -61,3 +61,5 @@ function getSelector(elem) {
     }
     return allSelectors.join(' > ');
 };
+
+exports.getSelector = getSelector;
