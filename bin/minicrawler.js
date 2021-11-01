@@ -12,24 +12,8 @@ const { Crawler } = require('..');
 
     const crawler = new Crawler(args.target_url, !args.no_headless);
 
-    crawler.handleRequest(req => {
-        // NOTE: we currently ignore requests from subframes
-        if (req.frame() !== crawler.page.mainFrame()) {
-            return;
-        }
-        crawler.xhrLogger.addRequest(req);
-
-        if (crawler.abortNavigation && req.isNavigationRequest()) {
-            req.abort('aborted');
-        } else {
-            req.continue();
-        }
-    });
-
     try {
-        await crawler.loadPage()
-
-        await crawler.clickAllEvents();
+        await crawler.crawl();
     } finally {
         await crawler.close();
     }

@@ -24,6 +24,7 @@ class Crawler {
 
         this.abortNavigation = false;
         this.preventNewFrames = false;
+        this.navigationWasAttempted = false;
         this.pageURL = null; // current URL, will be set after URL is opened
 
         this.headless = headless;
@@ -106,25 +107,33 @@ class Crawler {
 
         this.abortNavigation = true;
         this.preventNewFrames = true;
+        this.navigationWasAttempted = false;
     }
 
-    async clickAllEvents() {
-        const events = await getPossibleEvents(this.page);
-
+    async triggerEvents(events, alreadyDone) {
         for (const event of events) {
+            const elem = event.element;
+            const descr = elem._remoteObject.description;
+            const eventTag = event.type + ' ' + descr;
+            if (alreadyDone.has(eventTag)) {
+                log(`skip event ${eventTag}: already done it`);
+                continue;
+            }
+            alreadyDone.add(eventTag);
             if (event.type !== 'click') {
                 log(`skip event of type ${event.type}, only clicks are supported for now`);
                 continue;
             }
 
-            const elem = event.element;
-            const descr = elem._remoteObject.description;
             log('click', descr);
             try {
                 await elem.click();
             } catch(err) {
+                if (err.message === 'Node is detached from document') {
+                    log('Node detached from document, reload and retry');
+                    return [eventTag, false];
+                }
                 log('failed to click', descr, err);
-                console.log(err.message);
                 log('fall back to .click()');
                 try {
                     await this.page.evaluate(elem => elem.click(), elem);
@@ -133,7 +142,56 @@ class Crawler {
                 }
             }
             await this.settleTracker.waitToSettle();
+            if (this.navigationWasAttempted) {
+                log('navigation was triggred, maybe handle it somehow later');
+            }
             log('clicked, proceed to next event');
+        }
+        return [null, true];
+    }
+
+    #setupCrawlEventHandler() {
+        this.handleRequest(req => {
+            // NOTE: we currently ignore requests from subframes
+            if (req.frame() !== this.page.mainFrame()) {
+                return;
+            }
+            this.xhrLogger.addRequest(req);
+
+            if (this.abortNavigation && req.isNavigationRequest()) {
+                this.navigationWasAttempted = true;
+                req.abort('aborted');
+            } else {
+                req.continue();
+            }
+        });
+    }
+
+    async crawl() {
+        this.#setupCrawlEventHandler();
+
+        let prevRetryEvent = null;
+        const eventsAlreadyDone = new Set();
+
+        while (true) {
+            await this.loadPage();
+
+            const events = await getPossibleEvents(this.page);
+            const [retryEvent, allDone] = await this.triggerEvents(
+                events,
+                eventsAlreadyDone
+            );
+            if (allDone) {
+                break;
+            }
+            if (prevRetryEvent !== null && retryEvent === prevRetryEvent) {
+                log(`already retried ${retryEvent}, giving up on it`);
+                prevRetryEvent = null;
+            } else {
+                eventsAlreadyDone.delete(retryEvent);
+                prevRetryEvent = retryEvent;
+            }
+            this.abortNavigation = false;
         }
     }
 
