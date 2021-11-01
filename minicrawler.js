@@ -25,6 +25,7 @@ class Crawler {
         this.abortNavigation = false;
         this.preventNewFrames = false;
         this.navigationWasAttempted = false;
+        this.navigationTargets = new Set();
         this.pageURL = null; // current URL, will be set after URL is opened
 
         this.headless = headless;
@@ -160,6 +161,7 @@ class Crawler {
 
             if (this.abortNavigation && req.isNavigationRequest()) {
                 this.navigationWasAttempted = true;
+                this.navigationTargets.add(req.url());
                 req.abort('aborted');
             } else {
                 req.continue();
