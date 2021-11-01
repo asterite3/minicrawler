@@ -88,6 +88,8 @@ class Crawler {
 
         await page.setUserAgent(USER_AGENT);
 
+        page.on('dialog', async dialog => await dialog.dismiss());
+
         this.settleTracker = new SettleTracker(page, LOADED_COOLDOWN);
     }
 
