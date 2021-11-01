@@ -26,9 +26,7 @@ const EMAIL_FILL_TYPE = 'email';
 class Crawler {
     constructor(targetURL, headless=true) {
         // normalize
-        const u = new URL(targetURL);
-        u.hash = '';
-        this.targetURL = u.href;
+        this.targetURL = new URL(targetURL).href;
         this.xhrLogger = new XHRLogger(this.targetURL);
 
         this.abortNavigation = false;
@@ -330,6 +328,7 @@ class Crawler {
         this.handleRequest(req => {
             // NOTE: we currently ignore requests from subframes
             if (req.frame() !== this.page.mainFrame()) {
+                req.continue();
                 return;
             }
             this.xhrLogger.addRequest(req);
