@@ -1,6 +1,8 @@
 const { ElementHandle } = require('puppeteer/lib/JSHandle');
 
+const { getSelector } = require('./get-selector');
 const { shuffleArray } = require('./utils');
+const { log } = require('./logging');
 
 const OBJECT_GROUP_NAME = 'event-listeners-group';
 
@@ -57,11 +59,31 @@ async function getPossibleEvents(page) {
             )
         };
     }));
-    return jsEvents.concat(
+    const events = jsEvents.concat(
         inputEvents,
         submitEvents,
         shuffleArray(clickEvents)
     );
+    for (const evt of events) {
+        const elem = evt.element;
+        let descr = elem._remoteObject.description;
+        const selectorIsGood = await page.evaluate(
+            (sel, el) =>  {
+                let elems = document.querySelectorAll(sel);
+                return elems.length === 1 && elems[0] === el;
+            },
+            descr,
+            elem
+        );
+
+        if (!selectorIsGood) {
+            const oldDescr = descr;
+            descr = await page.evaluate(getSelector, elem);
+            //log(`generated more accurate selector ${descr} instead of ${oldDescr}`);
+        }
+        evt.selector = descr;
+    }
+    return events;
 };
 
 exports.getPossibleEvents = getPossibleEvents;

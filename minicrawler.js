@@ -276,27 +276,7 @@ class Crawler {
     async triggerEvents(events, alreadyDone) {
         for (const event of events) {
             const elem = event.element;
-            let descr = elem._remoteObject.description;
-
-            if (!await this.page.evaluate(el => el.isConnected, elem)) {
-                log(`Node ${descr} detached from document, reload and retry`);
-                return [null, false];
-            }
-
-            const [selectorIsGood, elemCount] = await this.page.evaluate(
-                (sel, el) =>  {
-                    let elems = document.querySelectorAll(sel);
-                    return [elems.length === 1 && elems[0] === el, elems.length]
-                },
-                descr,
-                elem
-            );
-
-            if (!selectorIsGood) {
-                const oldDescr = descr;
-                descr = await this.page.evaluate(getSelector, elem);
-                log(`generated more accurate selector ${descr} instead of ${oldDescr}`);
-            }
+            const descr = event.selector;
 
             const eventTag = event.type + ' ' + descr;
 
@@ -305,6 +285,11 @@ class Crawler {
                 continue;
             }
             alreadyDone.add(eventTag);
+
+            if (!await this.page.evaluate(el => el.isConnected, elem)) {
+                log(`Node ${descr} detached from document, reload and retry`);
+                return [eventTag, false];
+            }
 
             let shouldReload = false;
 
