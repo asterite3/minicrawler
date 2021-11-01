@@ -2,6 +2,7 @@
 
 const puppeteer = require('puppeteer');
 const { ArgumentParser } = require('argparse');
+const crypto = require('crypto');
 
 const { XHRLogger } = require('./xhr-logger');
 const { SettleTracker } = require('./settle-tracker');
@@ -9,13 +10,17 @@ const { getPossibleEvents } = require('./page-events');
 const { getSelector } = require('./get-selector');
 const { log } = require('./logging');
 
-const { withTimeout, wait } = require('./utils');
+const { withTimeout, wait, getRandomString } = require('./utils');
 
 const LOADED_COOLDOWN = 250;
 const PAGE_LOAD_TIMEOUT = 3 * 60 * 1000;
 const MAX_TIMEOUT_COUNT = 2;
 
 const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.54 Safari/537.36";
+
+const TEXT_FILL_TYPE = 'text';
+const NUMBER_FILL_TYPE = 'number';
+const EMAIL_FILL_TYPE = 'email';
 
 class Crawler {
     constructor(targetURL, headless=true) {
@@ -136,7 +141,7 @@ class Crawler {
         this.navigationWasAttempted = false;
     }
 
-    async performClick(elem, descr) {
+    async click(elem, descr) {
         log('click', descr);
         try {
             await elem.click();
@@ -154,6 +159,107 @@ class Crawler {
             }
         }
         return false;
+    }
+
+    async fillPhysically(elem, descr, fillType) {
+        let fillText;
+        switch (fillType) {
+            case TEXT_FILL_TYPE:
+                fillText = getRandomString(8);
+                break;
+            case EMAIL_FILL_TYPE:
+                fillText = 'test' + getRandomString(8) + '@testing.org';
+                break;
+            case NUMBER_FILL_TYPE:
+                fillText = crypto.randomInt(100).toString();
+                break;
+            default:
+                throw new Error(`Unexpected fill type: ${fillType}`);
+        }
+        await elem.type(fillText);
+    }
+
+    async checkVisible(elem) {
+        return await elem.evaluate(el => new Promise(resolve => {
+            const observer = new IntersectionObserver((entries) => {
+                if(entries[0].isIntersecting){
+                    observer.disconnect();
+                    resolve(true);
+                } else {
+                    observer.disconnect();
+                    resolve(false);
+                }
+            });
+            observer.observe(el);
+        }));
+    }
+
+    async #tryToOickPhysicalFillMethodAndUseIt(elem, descr) {
+        const tagName = await (await elem.getProperty('tagName')).jsonValue();
+        switch (tagName) {
+            case 'TEXTAREA':
+                await this.fillPhysically(elem, descr, TEXT_FILL_TYPE);
+                return true;
+            case 'INPUT':
+                const type = await (await elem.getProperty('type')).jsonValue();
+                switch (type) {
+                    case 'text':
+                    case 'password':
+                        await this.fillPhysically(elem, descr, TEXT_FILL_TYPE);
+                        return true;
+                    case 'email':
+                        await this.fillPhysically(elem, descr, EMAIL_FILL_TYPE);
+                        return true;
+                    case 'number':
+                        await this.fillPhysically(elem, descr, NUMBER_FILL_TYPE);
+                        return true;
+                }
+        }
+        return false;
+    }
+
+    async fill(elem, descr) {
+        let filled = false;
+        try {
+            const isVisible = await this.checkVisible(elem);
+            if (isVisible) {
+                filled = this.#tryToOickPhysicalFillMethodAndUseIt(elem, descr);
+            }
+        } catch(err) {
+            if (err.message === 'Node is detached from document') {
+                log('Node detached from document, reload and retry');
+                return true;
+            }
+            log(`error filling ${descr}: ${err} ${err.stack}`);
+        }
+
+        if (!filled) {
+            log(`did not fill ${descr} physically, will dispatch event`);
+            this.dispatchEvent('input', elem, descr);
+        }
+
+        return false;
+    }
+
+    async submit(elem, descr) {
+        const tagName = await (await elem.getProperty('tagName')).jsonValue();
+        if (tagName === 'FORM') {
+            await elem.evaluate(el => el.requestSubmit());
+        } else {
+            log(`elem with submit handler is not a form, it is ${tagName}. Fall back to dispatchEvent`);
+            this.dispatchEvent('submit', elem, descr);
+        }
+        return false;
+    }
+
+    async dispatchEvent(type, elem, descr) {
+        try {
+            await elem.evaluate((elem, eventType) => {
+                elem.dispatchEvent(new Event(eventType));
+            }, type);
+        } catch(err) {
+            log(`failed to ${type} using dispatchEvent`, descr, err);
+        }
     }
 
     async triggerEvents(events, alreadyDone) {
@@ -180,19 +286,34 @@ class Crawler {
                 descr = await this.page.evaluate(getSelector, elem);
                 log(`generated more accurate selector ${descr} instead of ${oldDescr}`);
             }
+
             const eventTag = event.type + ' ' + descr;
+
             if (alreadyDone.has(eventTag)) {
                 log(`skip event ${eventTag}: already done it`);
                 continue;
             }
             alreadyDone.add(eventTag);
-            if (event.type !== 'click') {
-                log(`skip event of type ${event.type}, only clicks are supported for now`);
-                continue;
+
+            let shouldReload = false;
+
+            log(`trigger event ${eventTag}`);
+
+            switch (event.type) {
+                case 'load':
+                    continue;
+                case 'click':
+                    shouldReload = await this.click(elem, descr);
+                    break;
+                case 'input':
+                    shouldReload = await this.fill(elem, descr);
+                    break;
+                case 'submit':
+                    shouldReload = await this.submit(elem, descr);
+                    break;
+                default:
+                    shouldReload = await this.dispatchEvent(event.type, elem, descr);
             }
-
-            const shouldReload = await this.performClick(elem, descr);
-
             if (shouldReload) {
                 return [eventTag, false];
             }
@@ -204,7 +325,7 @@ class Crawler {
             if (this.navigationWasAttempted) {
                 log('navigation was triggred, maybe handle it somehow later');
             }
-            log('clicked, proceed to next event');
+            log('event triggered, proceed to next event');
         }
         return [null, true];
     }

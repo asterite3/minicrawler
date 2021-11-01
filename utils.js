@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 function wait(d) {
     return new Promise(resolve => setTimeout(resolve, d));
 }
@@ -24,6 +26,11 @@ async function withTimeout(p, d) {
     }
 }
 
+function getRandomString(byteLen=20) {
+    return crypto.randomBytes(byteLen).toString('hex');
+}
+
 exports.wait = wait;
 exports.waitWithCancel = waitWithCancel;
 exports.withTimeout = withTimeout;
+exports.getRandomString = getRandomString;

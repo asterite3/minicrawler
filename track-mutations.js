@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const { getRandomString } = require('./utils');
 
 function trackMutations(datenowName) {
     const timestampContainer = {
@@ -29,7 +29,7 @@ class PageMutationTracker {
         this.cooldown = cooldown;
         this.domContentLoaded = false;
 
-        let datenowName = crypto.randomBytes(20).toString('hex');
+        let datenowName = getRandomString();
 
         this.ready = page.evaluateOnNewDocument(datenowName => {
             window[Symbol.for(datenowName)] = Date.now;
