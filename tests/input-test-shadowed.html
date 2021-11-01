@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>input test</title>
+    <script type="text/javascript">
+        window.onload = function () {
+            const inp = document.getElementById("testinput");
+            inp.addEventListener('input', function() {
+                fetch('/podskazka');
+            })
+        };
+    </script>
+    <style type="text/css">
+        .shadower {
+            height: 500px;
+            width: 500px;
+            background-color: black;
+            position: absolute;
+        }
+     </style>
+</head>
+<body>
+    <!--<div class="shadower"></div>-->
+    <div style="display: none;">
+        <input type="TeXt" name="test-input" id="testinput" > <!--oninput="console.log('value typed');"> -->
+    </div>
+</body>
+</html>

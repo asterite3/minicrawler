@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>input test</title>
+    <script type="text/javascript">
+        window.onload = function () {
+            const f = document.getElementById("frm");
+            f.addEventListener('submit', function() {
+                console.log('huipizda');
+                fetch('/otpravka');
+            })
+        };
+    </script>
+</head>
+<body>
+    <form action="/hui" method="POST" id="frm" onsubmit="console.log('SUB');fetch('/pidorstvo');">
+        <input type="text" name="test-input" id="testinput"> <!--oninput="console.log('value typed');"> -->
+    </form>
+</body>
+</html>
