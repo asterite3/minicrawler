@@ -8,10 +8,11 @@ const { log } = require('../logging');
 
     parser.add_argument('target_url');
     parser.add_argument('--no-headless', { action: 'store_true' });
+    parser.add_argument('--proxy', { type: String });
 
     const args = parser.parse_args();
 
-    const crawler = new Crawler(args.target_url, !args.no_headless);
+    const crawler = new Crawler(args.target_url, !args.no_headless, args.proxy);
 
     try {
         log(`start crawling ${args.target_url}`);

@@ -24,7 +24,7 @@ const NUMBER_FILL_TYPE = 'number';
 const EMAIL_FILL_TYPE = 'email';
 
 class Crawler {
-    constructor(targetURL, headless=true) {
+    constructor(targetURL, headless=true, proxy) {
         // normalize
         this.targetURL = new URL(targetURL).href;
         this.xhrLogger = new XHRLogger(this.targetURL);
@@ -36,6 +36,7 @@ class Crawler {
         this.pageURL = null; // current URL, will be set after URL is opened
 
         this.headless = headless;
+        this.proxy = proxy;
 
         this.pageIsCreated = this.createPage();
         this.timeout = PAGE_LOAD_TIMEOUT;
@@ -77,6 +78,9 @@ class Crawler {
             headless: this.headless,
             ignoreHTTPSErrors: true
         };
+        if (typeof this.proxy !== 'undefined') {
+            options.args = [`--proxy-server=${this.proxy}`];
+        }
         if (!this.headless) {
             options.defaultViewport = null;
         }
