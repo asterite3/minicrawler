@@ -68,9 +68,13 @@ async function getPossibleEvents(page) {
         const elem = evt.element;
         let descr = elem._remoteObject.description;
         const selectorIsGood = await page.evaluate(
-            (sel, el) =>  {
-                let elems = document.querySelectorAll(sel);
-                return elems.length === 1 && elems[0] === el;
+            (sel, el) => {
+                try {
+                    let elems = document.querySelectorAll(sel);
+                    return elems.length === 1 && elems[0] === el;
+                } catch (err) {
+                    return false;
+                }
             },
             descr,
             elem
