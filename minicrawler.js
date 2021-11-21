@@ -24,7 +24,7 @@ const NUMBER_FILL_TYPE = 'number';
 const EMAIL_FILL_TYPE = 'email';
 
 class Crawler {
-    constructor(targetURL, headless=true, proxy) {
+    constructor(targetURL, headless=true, reqExtraHeaders={}, proxy) {
         // normalize
         this.targetURL = new URL(targetURL).href;
         this.xhrLogger = new XHRLogger(this.targetURL);
@@ -41,6 +41,7 @@ class Crawler {
         this.pageIsCreated = this.createPage();
         this.timeout = PAGE_LOAD_TIMEOUT;
         this.timeoutCount = 0;
+        this.reqExtraHeaders = reqExtraHeaders;
     }
 
     async withTimeout(p) {
@@ -98,6 +99,10 @@ class Crawler {
         this.page = page;
 
         await page.setUserAgent(USER_AGENT);
+
+        if (Object.keys(this.reqExtraHeaders).length > 0) {
+            await page.setExtraHTTPHeaders(this.reqExtraHeaders);
+        }
 
         page.on('dialog', async dialog => await dialog.dismiss());
 
