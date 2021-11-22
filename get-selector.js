@@ -1,4 +1,4 @@
-function getSelector(elem) {
+function getSelector(elem, raiseForDetachedElem) {
     var selector = '',
         allSelectors = [],
         parentElement,
@@ -17,7 +17,11 @@ function getSelector(elem) {
         }
 
         if (!elem.parentElement) {
-            throw Error('getSelector called for element (' + elem + ') not connected to DOM tree');
+            if (raiseForDetachedElem) {
+                throw Error('getSelector called for element (' + elem + ') not connected to DOM tree');
+            } else {
+                return null;
+            }
         }
 
         parentElement = elem.parentElement;
