@@ -82,12 +82,12 @@ async function getPossibleEvents(page) {
 
         if (!selectorIsGood) {
             const oldDescr = descr;
-            descr = await page.evaluate(getSelector, elem);
+            descr = await page.evaluate(getSelector, elem, false);
             //log(`generated more accurate selector ${descr} instead of ${oldDescr}`);
         }
         evt.selector = descr;
     }
-    return events;
+    return events.filter(evt => evt.selector !== null);
 };
 
 exports.getPossibleEvents = getPossibleEvents;
