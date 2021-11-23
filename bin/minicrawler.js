@@ -9,10 +9,23 @@ const { log } = require('../logging');
     parser.add_argument('target_url');
     parser.add_argument('--no-headless', { action: 'store_true' });
     parser.add_argument('--proxy', { type: String });
+    parser.add_argument('-H', '--headers', { action: 'append', nargs: '+', default: [] })
 
     const args = parser.parse_args();
+    
+    let reqExtraHeaders = {};
 
-    const crawler = new Crawler(args.target_url, !args.no_headless, args.proxy);
+    for (const s of args.headers) {
+        if (!s[0].includes(': ')) {
+            console.warn(`Warning: wrong header format, ignoring: "${s}"`);
+            continue;
+        }
+        const name = s[0].split(': ')[0];
+        const value = s[0].split(': ').slice(1)[0];
+        reqExtraHeaders[name] = value;
+    }
+
+    const crawler = new Crawler(args.target_url, !args.no_headless, reqExtraHeaders, args.proxy);
 
     try {
         log(`start crawling ${args.target_url}`);
