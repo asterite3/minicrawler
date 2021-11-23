@@ -17,7 +17,7 @@ const { log } = require('../logging');
 
     for (const s of args.headers) {
         if (!s[0].includes(': ')) {
-            console.warn(`Warning: wrong header format: "${s}"`);
+            console.warn(`Warning: wrong header format, ignoring: "${s}"`);
             continue;
         }
         const name = s[0].split(': ')[0];
