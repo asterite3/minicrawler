@@ -130,6 +130,7 @@ class Crawler {
         await this.pageIsCreated;
 
         try {
+            this.xhrLogger.interactionsStarted = false;
             await this.page.goto(this.targetURL, {
                 waitUntil: 'networkidle0',
                 timeout: timeout,
@@ -402,6 +403,8 @@ class Crawler {
                     return false;
                 }
             })
+
+            this.xhrLogger.interactionsStarted = true;
 
             const [retryEvent, allDone] = await this.triggerEvents(
                 events,
