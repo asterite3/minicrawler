@@ -16,6 +16,7 @@ class SettleTracker {
         page.on('requestfailed', this.handleRequestEnded.bind(this));
 
         this.stopped = false;
+        this.seenRequests = new Set();
         // this.pendingRequests = Object.create(null);
     }
 
@@ -29,6 +30,16 @@ class SettleTracker {
         if (req.frame() !== this.frame) {
             return;
         }
+
+        // Sometimes Puppeteer would issue multiple 'request' events for the
+        // same request. Workaround this by checking if we've seen their ids
+        // See #6513
+        const reqID = req._requestId;
+        if (this.seenRequests.has(reqID)) {
+            return;
+        }
+        this.seenRequests.add(reqID);
+
         this.pendingRequestCount++;
     }
 
