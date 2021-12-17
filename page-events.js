@@ -1,4 +1,4 @@
-const { ElementHandle } = require('puppeteer-core/internal/common/ElementHandle.js');
+const { CDPElementHandle: ElementHandle } = require('puppeteer-core');
 
 const { getSelector } = require('./get-selector');
 const { shuffleArray } = require('./utils');
