@@ -1,4 +1,4 @@
-const { ElementHandle } = require('puppeteer/lib/JSHandle');
+const { CDPElementHandle: ElementHandle } = require('puppeteer-core');
 
 const { getSelector } = require('./get-selector');
 const { shuffleArray } = require('./utils');
@@ -28,12 +28,14 @@ async function getPossibleEvents(page) {
         element: el
     }));
 
-    const { result: html } = await page._client.send('Runtime.evaluate', {
+    const client = page._client();
+
+    const { result: html } = await client.send('Runtime.evaluate', {
         expression: 'document.documentElement',
         objectGroup: OBJECT_GROUP_NAME
     });
 
-    const eventListeners = await page._client.send(
+    const eventListeners = await client.send(
         'DOMDebugger.getEventListeners',
         {
             objectId: html.objectId,
@@ -41,22 +43,22 @@ async function getPossibleEvents(page) {
         }
     );
 
-    const executionContext = await page.mainFrame().executionContext();
+    const frame = page.mainFrame();
+    const executionContext = await frame.executionContext();
 
     const jsEvents = await Promise.all(eventListeners.listeners.map(async listener => {
-        const nodeRemoteObject = await page._client.send('DOM.resolveNode', {
+        const nodeRemoteObject = await client.send('DOM.resolveNode', {
             backendNodeId: listener.backendNodeId,
             objectGroup: OBJECT_GROUP_NAME,
         });
+        const e = new ElementHandle(
+                executionContext,
+                nodeRemoteObject.object,
+                frame
+            );
         return {
             type: listener.type,
-            element: new ElementHandle(
-                executionContext,
-                page._client,
-                nodeRemoteObject.object,
-                page,
-                page._frameManager
-            )
+            element: e
         };
     }));
     const events = jsEvents.concat(
@@ -66,7 +68,7 @@ async function getPossibleEvents(page) {
     );
     for (const evt of events) {
         const elem = evt.element;
-        let descr = elem._remoteObject.description;
+        let descr = elem.remoteObject().description;
         const selectorIsGood = await page.evaluate(
             (sel, el) => {
                 try {
