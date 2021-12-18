@@ -138,13 +138,15 @@ class Crawler {
     }
 
     async loadPage(timeout=PAGE_LOAD_TIMEOUT) {
+        let response;
+
         await this.pageIsCreated;
 
         try {
             if (this.xhrLogger) {
                 this.xhrLogger.interactionsStarted = false;
             }
-            await this.page.goto(this.targetURL, {
+            response = await this.page.goto(this.targetURL, {
                 waitUntil: 'networkidle0',
                 timeout: timeout,
             });
@@ -152,7 +154,8 @@ class Crawler {
             if (!(err instanceof puppeteer.errors.TimeoutError)) {
                 throw(err);
             } else {
-                log(`warning: page.goto timed out (with networkidle0)`)
+                log(`warning: page.goto timed out (with networkidle0)`);
+                return null;
             }
         }
 
@@ -171,6 +174,8 @@ class Crawler {
         this.abortNavigation = true;
         this.preventNewFrames = true;
         this.navigationWasAttempted = false;
+
+        return response;
     }
 
     async click(elem, descr) {
