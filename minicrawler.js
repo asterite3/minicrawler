@@ -151,12 +151,12 @@ class Crawler {
 
         await this.pageIsCreated;
 
+        const wu = this.waitMode === 'strict' ? 'networkidle0' : this.waitMode;
+
         try {
             if (this.xhrLogger) {
                 this.xhrLogger.interactionsStarted = false;
             }
-
-            const wu = this.waitMode === 'strict' ? 'networkidle0' : this.waitMode;
 
             response = await this.page.goto(this.targetURL, {
                 waitUntil: wu,
@@ -166,12 +166,12 @@ class Crawler {
             if (!(err instanceof puppeteer.errors.TimeoutError)) {
                 throw(err);
             } else {
-                log(`warning: page.goto timed out (with networkidle0)`);
+                log(`warning: page.goto timed out (with ${wu})`);
                 return null;
             }
         }
 
-        log('page load complete, networkidle0 arrived. Wait to settle');
+        log(`page load complete, ${wu} arrived. Wait to settle`);
 
         await this.waitToSettle();
 
