@@ -43,6 +43,9 @@ class Crawler {
         this.navigationTargets = new Set();
         this.pageURL = null; // current URL, will be set after URL is opened
 
+        this.page = null;
+        this.browser = null;
+
         this.headless = headless;
         this.proxy = proxy;
 
