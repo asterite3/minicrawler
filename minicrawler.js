@@ -12,7 +12,7 @@ const { log } = require('./logging');
 
 const { withTimeout, wait, getRandomString } = require('./utils');
 
-const LOADED_COOLDOWN = 250;
+const DEFAULT_LOADED_COOLDOWN = 250;
 const PAGE_LOAD_TIMEOUT = 3 * 60 * 1000;
 const MAX_TIMEOUT_COUNT = 2;
 const MAX_TIMEOUT_COUNT2 = 40;
@@ -29,10 +29,17 @@ class Crawler {
         headless=true,
         reqExtraHeaders={},
         proxy,
-        logXHR=true
+        options={}
     ) {
+        const {
+            logXHR=true,
+            waitMode='strict',
+            loadedCooldown=DEFAULT_LOADED_COOLDOWN
+        } = options;
+
         // normalize
         this.targetURL = new URL(targetURL).href;
+
         if (logXHR) {
             this.xhrLogger = new XHRLogger(this.targetURL);
         }
@@ -48,6 +55,8 @@ class Crawler {
 
         this.headless = headless;
         this.proxy = proxy;
+        this.waitMode = waitMode;
+        this.loadedCooldown = loadedCooldown;
 
         this.pageIsCreated = this.createPage();
         this.timeout = PAGE_LOAD_TIMEOUT;
@@ -117,7 +126,7 @@ class Crawler {
 
         page.on('dialog', async dialog => await dialog.dismiss());
 
-        this.settleTracker = new SettleTracker(page, LOADED_COOLDOWN);
+        this.settleTracker = new SettleTracker(page, this.loadedCooldown);
     }
 
     /*async reload() {
@@ -146,8 +155,11 @@ class Crawler {
             if (this.xhrLogger) {
                 this.xhrLogger.interactionsStarted = false;
             }
+
+            const wu = this.waitMode === 'strict' ? 'networkidle0' : this.waitMode;
+
             response = await this.page.goto(this.targetURL, {
-                waitUntil: 'networkidle0',
+                waitUntil: wu,
                 timeout: timeout,
             });
         } catch (err) {
