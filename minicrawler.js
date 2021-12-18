@@ -24,10 +24,18 @@ const NUMBER_FILL_TYPE = 'number';
 const EMAIL_FILL_TYPE = 'email';
 
 class Crawler {
-    constructor(targetURL, headless=true, reqExtraHeaders={}, proxy) {
+    constructor(
+        targetURL,
+        headless=true,
+        reqExtraHeaders={},
+        proxy,
+        logXHR=true
+    ) {
         // normalize
         this.targetURL = new URL(targetURL).href;
-        this.xhrLogger = new XHRLogger(this.targetURL);
+        if (logXHR) {
+            this.xhrLogger = new XHRLogger(this.targetURL);
+        }
 
         this.abortNavigation = false;
         this.preventNewFrames = false;
@@ -130,7 +138,9 @@ class Crawler {
         await this.pageIsCreated;
 
         try {
-            this.xhrLogger.interactionsStarted = false;
+            if (this.xhrLogger) {
+                this.xhrLogger.interactionsStarted = false;
+            }
             await this.page.goto(this.targetURL, {
                 waitUntil: 'networkidle0',
                 timeout: timeout,
@@ -341,7 +351,7 @@ class Crawler {
                 req.continue();
                 return;
             }
-            this.xhrLogger.addRequest(req);
+            this?.xhrLogger.addRequest(req);
 
             if (this.abortNavigation && req.isNavigationRequest()) {
                 this.navigationWasAttempted = true;
@@ -404,7 +414,9 @@ class Crawler {
                 }
             })
 
-            this.xhrLogger.interactionsStarted = true;
+            if (this.xhrLogger) {
+                this.xhrLogger.interactionsStarted = true;
+            }
 
             const [retryEvent, allDone] = await this.triggerEvents(
                 events,
