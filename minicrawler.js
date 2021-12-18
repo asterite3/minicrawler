@@ -17,7 +17,7 @@ const PAGE_LOAD_TIMEOUT = 3 * 60 * 1000;
 const MAX_TIMEOUT_COUNT = 2;
 const MAX_TIMEOUT_COUNT2 = 40;
 
-const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.54 Safari/537.36";
+const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.5481.77 Safari/537.36";
 
 const TEXT_FILL_TYPE = 'text';
 const NUMBER_FILL_TYPE = 'number';
