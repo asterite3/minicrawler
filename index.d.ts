@@ -12,5 +12,6 @@ export declare class Crawler {
         options?: object
     );
     loadPage(timeout?: number): Promise<puppeteer.HTTPResponse>;
+    handleRequest(cb: (req: puppeteer.HTTPRequest) => void): Promise<void>;
     close(): Promise<void>;
 }
