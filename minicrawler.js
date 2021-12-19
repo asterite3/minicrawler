@@ -34,7 +34,8 @@ class Crawler {
         const {
             logXHR=true,
             waitMode='strict',
-            loadedCooldown=DEFAULT_LOADED_COOLDOWN
+            loadedCooldown=DEFAULT_LOADED_COOLDOWN,
+            executablePath=null
         } = options;
 
         // normalize
@@ -57,6 +58,7 @@ class Crawler {
         this.proxy = proxy;
         this.waitMode = waitMode;
         this.loadedCooldown = loadedCooldown;
+        this.executablePath = executablePath;
 
         this.pageIsCreated = this.createPage();
         this.timeout = PAGE_LOAD_TIMEOUT;
@@ -95,12 +97,14 @@ class Crawler {
 
     async createPage() {
         const options = {
-            executablePath: 'google-chrome',
             headless: this.headless,
             ignoreHTTPSErrors: true
         };
         if (typeof this.proxy !== 'undefined') {
             options.args = [`--proxy-server=${this.proxy}`];
+        }
+        if (this.executablePath !== null) {
+            options.executablePath = this.executablePath;
         }
         if (!this.headless) {
             options.defaultViewport = null;

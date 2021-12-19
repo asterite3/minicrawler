@@ -27,7 +27,15 @@ const { log } = require('../logging');
         reqExtraHeaders[name] = value;
     }
 
-    const crawler = new Crawler(args.target_url, !args.no_headless, reqExtraHeaders, args.proxy);
+    const crawler = new Crawler(
+        args.target_url,
+        !args.no_headless,
+        reqExtraHeaders,
+        args.proxy,
+        {
+            executablePath: 'google-chrome'
+        }
+    );
 
     try {
         log(`start crawling ${args.target_url}`);
