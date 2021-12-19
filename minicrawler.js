@@ -10,7 +10,7 @@ const { getPossibleEvents } = require('./page-events');
 const { getSelector } = require('./get-selector');
 const { log } = require('./logging');
 
-const { withTimeout, wait, getRandomString } = require('./utils');
+const { withTimeout, wait, getRandomString, parseProxy } = require('./utils');
 
 const DEFAULT_LOADED_COOLDOWN = 250;
 const PAGE_LOAD_TIMEOUT = 3 * 60 * 1000;
@@ -55,7 +55,11 @@ class Crawler {
         this.browser = null;
 
         this.headless = headless;
-        this.proxy = proxy;
+
+        if (typeof proxy !== 'undefined') {
+            this.proxySettings = parseProxy(proxy);
+        }
+
         this.waitMode = waitMode;
         this.loadedCooldown = loadedCooldown;
         this.executablePath = executablePath;
@@ -100,8 +104,8 @@ class Crawler {
             headless: this.headless,
             ignoreHTTPSErrors: true
         };
-        if (typeof this.proxy !== 'undefined') {
-            options.args = [`--proxy-server=${this.proxy}`];
+        if (typeof this.proxySettings !== 'undefined') {
+            options.args = [`--proxy-server=${this.proxySettings.addr}`];
         }
         if (this.executablePath !== null) {
             options.executablePath = this.executablePath;
@@ -120,6 +124,12 @@ class Crawler {
         })
 
         const page = await browser.newPage();
+        if (this.proxySettings?.username && this.proxySettings?.password) {
+            await page.authenticate({
+                username: this.proxySettings.username,
+                password: this.proxySettings.password,
+            });
+        }
         this.page = page;
 
         await page.setUserAgent(USER_AGENT);

@@ -48,9 +48,21 @@ function shuffleArray(array) {
   return array;
 }
 
+function parseProxy(proxy) {
+    const parsedProxy = new URL(proxy);
+    if (parsedProxy.username === "" && parsedProxy.password === "") {
+        return { addr: parsedProxy.origin };
+    }
+    return {
+        addr: parsedProxy.origin,
+        username: parsedProxy.username,
+        password: parsedProxy.password,
+    };
+}
 
 exports.wait = wait;
 exports.waitWithCancel = waitWithCancel;
 exports.withTimeout = withTimeout;
 exports.getRandomString = getRandomString;
 exports.shuffleArray = shuffleArray;
+exports.parseProxy = parseProxy;
