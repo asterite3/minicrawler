@@ -36,7 +36,8 @@ class Crawler {
             waitMode='strict',
             loadedCooldown=DEFAULT_LOADED_COOLDOWN,
             executablePath=null,
-            timeout=PAGE_LOAD_TIMEOUT
+            timeout=PAGE_LOAD_TIMEOUT,
+            extraArgs=[]
         } = options;
 
         // normalize
@@ -64,6 +65,7 @@ class Crawler {
         this.waitMode = waitMode;
         this.loadedCooldown = loadedCooldown;
         this.executablePath = executablePath;
+        this.extraArgs = extraArgs;
 
         this.pageIsCreated = this.createPage();
         this.timeout = timeout;
@@ -103,10 +105,11 @@ class Crawler {
     async createPage() {
         const options = {
             headless: this.headless,
-            ignoreHTTPSErrors: true
+            ignoreHTTPSErrors: true,
+            args: this.extraArgs,
         };
         if (typeof this.proxySettings !== 'undefined') {
-            options.args = [`--proxy-server=${this.proxySettings.addr}`];
+            options.args.push(`--proxy-server=${this.proxySettings.addr}`);
         }
         if (this.executablePath !== null) {
             options.executablePath = this.executablePath;
