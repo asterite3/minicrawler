@@ -35,7 +35,8 @@ class Crawler {
             logXHR=true,
             waitMode='strict',
             loadedCooldown=DEFAULT_LOADED_COOLDOWN,
-            executablePath=null
+            executablePath=null,
+            timeout=PAGE_LOAD_TIMEOUT
         } = options;
 
         // normalize
@@ -65,7 +66,7 @@ class Crawler {
         this.executablePath = executablePath;
 
         this.pageIsCreated = this.createPage();
-        this.timeout = PAGE_LOAD_TIMEOUT;
+        this.timeout = timeout;
         this.timeoutCount = 0;
         this.reqExtraHeaders = reqExtraHeaders;
     }
@@ -160,10 +161,14 @@ class Crawler {
         this.page.on('response', handler);
     }
 
-    async loadPage(timeout=PAGE_LOAD_TIMEOUT) {
+    async loadPage(timeout=null) {
         let response;
 
         await this.pageIsCreated;
+
+        if (timeout !== null) {
+            this.timeout = timeout;
+        }
 
         const wu = this.waitMode === 'strict' ? 'networkidle0' : this.waitMode;
 
@@ -174,7 +179,7 @@ class Crawler {
 
             response = await this.page.goto(this.targetURL, {
                 waitUntil: wu,
-                timeout: timeout,
+                timeout: this.timeout,
             });
         } catch (err) {
             if (!(err instanceof puppeteer.errors.TimeoutError)) {
