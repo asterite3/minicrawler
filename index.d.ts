@@ -6,6 +6,7 @@ interface CrawlerOptions {
     loadedCooldown?: number;
     executablePath?: string | null;
     timeout?: number;
+    extraArgs?: string[];
 }
 
 export declare class Crawler {
