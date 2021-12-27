@@ -51,10 +51,10 @@ function shuffleArray(array) {
 function parseProxy(proxy) {
     const parsedProxy = new URL(proxy);
     if (parsedProxy.username === "" && parsedProxy.password === "") {
-        return { addr: parsedProxy.origin };
+        return { addr: `${parsedProxy.protocol}//${parsedProxy.host}` };
     }
     return {
-        addr: parsedProxy.origin,
+        addr: `${parsedProxy.protocol}//${parsedProxy.host}`,
         username: parsedProxy.username,
         password: parsedProxy.password,
     };
