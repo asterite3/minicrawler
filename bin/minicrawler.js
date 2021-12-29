@@ -31,10 +31,7 @@ const { log } = require('../logging');
         args.target_url,
         !args.no_headless,
         reqExtraHeaders,
-        args.proxy,
-        {
-            executablePath: 'google-chrome'
-        }
+        args.proxy
     );
 
     try {
